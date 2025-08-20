@@ -1,4 +1,6 @@
-﻿function Validar-Archivo {
+﻿#Editado por David el 19/08/2025
+
+function Validar-Archivo {
     param([string] $Ruta)
 
     try {
