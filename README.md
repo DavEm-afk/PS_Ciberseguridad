@@ -7,4 +7,4 @@ Al desarrollarlos aprendí, al igual que con todas las actividades de PowerShell
 Informacion.
 Nombre: David Emiliano Rangel
 
-*Ejercicio 17. Necesario tener un archivo txt en la misma carpeta que el archivo, del script con la apikey de have i been pwned.
+*Ejercicio 17. Necesario tener un archivo txt llamado "apikey", en la misma carpeta que el archivo del script con el apikey de have i been pwned. (No compartir publicamente)
