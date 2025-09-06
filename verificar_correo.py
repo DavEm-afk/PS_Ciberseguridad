@@ -1,61 +1,79 @@
+import sys, requests, time, os, getpass, logging, csv
+from datetime import datetime
 
-import sys, requests, time
 
-if len(sys.argv) != 2: 
-    print("Uso: python verificar_correo.py correo@example.com") 
-    sys.exit(1) 
+if not os.path.exists("apikey.txt"):
+    print("🔐 No se encontró el archivo apikey.txt.")
+    clave = getpass.getpass("Ingresa tu API key: ")
+    with open("apikey.txt", "w") as archivo:
+        archivo.write(clave.strip())
 
-correo = sys.argv[1] 
+with open("apikey.txt", "r") as archivo:
+    api_key = archivo.read().strip()
 
-try: 
-    with open("apikey.txt", "r") as archivo: 
-        api_key = archivo.read().strip() 
+logging.basicConfig(
+    filename="registro.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-except FileNotFoundError: 
-    print("Error: No se encontró el archivo apikey.txt") 
-    sys.exit(1) 
+if len(sys.argv) != 2:
+    print("Uso: python verificar_correo.py correo@example.com")
+    sys.exit(1)
 
-url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{correo}" 
+correo = sys.argv[1]
 
-headers = { 
-    "hibp-api-key": api_key, 
-    "user-agent": "PythonScript" 
-} 
+url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{correo}"
+headers = {
+    "hibp-api-key": api_key,
+    "user-agent": "PythonScript"
+}
 
-response = requests.get(url, headers=headers) 
+try:
+    response = requests.get(url, headers=headers)
 
-if response.status_code == 200: 
-    brechas = response.json() 
-    print(f"\nLa cuenta {correo} ha sido comprometida en {len(brechas)} brechas.") 
-    print("Mostrando detalles de las primeras 3 brechas:\n") 
+    if response.status_code == 200:
+        brechas = response.json()
+        logging.info(f"Consulta exitosa para {correo}. Brechas encontradas: {len(brechas)}")
 
-    for i, brecha in enumerate(brechas[:3]): 
-        nombre = brecha['Name'] 
-        detalle_url = f"https://haveibeenpwned.com/api/v3/breach/{nombre}" 
-        detalle_resp = requests.get(detalle_url, headers=headers) 
+        with open("reporte.csv", "w", newline='', encoding="utf-8") as archivo_csv:
+            writer = csv.writer(archivo_csv)
+            writer.writerow(["Título", "Dominio", "Fecha de Brecha", "Datos Comprometidos",
+                             "Verificada", "Sensible"])
 
-        if detalle_resp.status_code == 200: 
-            detalle = detalle_resp.json() 
-            print(f"Brecha {i+1}: {detalle.get('Title')}") 
-            print(f"Dominio: {detalle.get('Domain')}") 
-            print(f"Fecha de brecha: {detalle.get('BreachDate')}") 
-            print(f"Fecha registrada: {detalle.get('AddedDate')}") 
-            print(f"Datos comprometidos: {', '.join(detalle.get('DataClasses', []))}") 
-            print(f"Descripción: {detalle.get('Description')[:300]}...\n") 
-            print("-" * 60) 
+            for i, brecha in enumerate(brechas[:3]):
+                nombre = brecha['Name']
+                detalle_url = f"https://haveibeenpwned.com/api/v3/breach/{nombre}"
+                detalle_resp = requests.get(detalle_url, headers=headers)
 
-        else: 
-            print(f"No se pudo obtener detalles de la brecha: {nombre}") 
+                if detalle_resp.status_code == 200:
+                    detalle = detalle_resp.json()
+                    writer.writerow([
+                        detalle.get("Title"),
+                        detalle.get("Domain"),
+                        detalle.get("BreachDate"),
+                        ", ".join(detalle.get("DataClasses", [])),
+                        detalle.get("IsVerified"),
+                        detalle.get("IsSensitive")
+                    ])
+                else:
+                    logging.error(f"No se pudo obtener detalles de la brecha: {nombre}")
 
-        if i < 2: 
-            print("Esperando 10 segundos antes de la siguiente consulta...\n") 
-            time.sleep(10) 
+                if i < 2:
+                    time.sleep(10)
 
-elif response.status_code == 404: 
-    print(f"La cuenta {correo} no aparece en ninguna brecha conocida.") 
+    elif response.status_code == 404:
+        logging.info(f"Consulta exitosa para {correo}. No se encontraron brechas.")
+        print(f"La cuenta {correo} no aparece en ninguna brecha conocida.")
 
-elif response.status_code == 401: 
-    print("Error de autenticación: revisa tu API key.") 
+    elif response.status_code == 401:
+        logging.error("Error 401: API key inválida.")
+        print("Error de autenticación: revisa tu API key.")
 
-else: 
-    print(f"Error inesperado. Código de estado: {response.status_code}") 
+    else:
+        logging.error(f"Error inesperado. Código de estado: {response.status_code}")
+        print(f"Error inesperado. Código de estado: {response.status_code}")
+
+except Exception as e:
+    logging.error(f"Excepción no controlada: {e}")
+    print(f"Ocurrió un error: {e}")
